@@ -1,0 +1,129 @@
+---
+title: "Projekt"
+output: html_document
+date: "2022-12-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##Lühikirjeldus
+
+**Andmestikuks valisin elurahulolu indeksi andmed viiest erinevast aastast enne koroona (seega aastad 2015-2019). Kuna andmed olid eraldi tabelites iga aasta kohta, siis panin andmed ühte tabelisse. Sealt võtsin välja Eesti ja meiega tihedalt seotud rrikide (Venemaa, Soome, Läti ja Leedu) positsioonid nendel aastatel ja tegin vastavate riikide asetuste kohta üldtabelis graafiku. Andmestikes leidub küll andmeid ka elurahulolu indeksi skoori erinevate komponentide kohta, kuid leidsin, et antud andmed teeksid tabeli liialt kirjuks, seega otsustasin mitte nendele keskenduda.**
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+```{r}
+df_2015 <- read.csv(file = '2015.csv')
+
+df_2016 <- read.csv(file = '2016.csv')
+
+df_2017 <- read.csv(file = '2017.csv')
+
+df_2018 <- read.csv(file = '2018.csv')
+
+df_2019 <- read.csv(file = '2019.csv')
+```
+
+```{r}
+df_2019 <- df_2019 %>% 
+       rename("Country" = "Country.or.region", "GDP_2019" = "GDP.per.capita", "Life_expectancy_2019"="Healthy.life.expectancy", "Freedom_2019"="Freedom.to.make.life.choices", "Corruption_2019"="Perceptions.of.corruption", "Rank_2019"="Overall.rank", "Social_support_2019"="Social.support", "Score_2019"="Score","Generosity_2019"="Generosity")
+
+df_2018 <- df_2018 %>% 
+       rename("Country" = "Country.or.region", "GDP_2018" = "GDP.per.capita", "Life_expectancy_2018"="Healthy.life.expectancy", "Freedom_2018"="Freedom.to.make.life.choices", "Corruption_2018"="Perceptions.of.corruption", "Rank_2018"="Overall.rank", "Social_support_2018"="Social.support","Score_2018"="Score", "Generosity_2018"="Generosity")
+
+df_2017 <- df_2017 %>% 
+  rename("GDP_2017" = "Economy..GDP.per.Capita.", "Rank_2017"="Happiness.Rank", "Life_expectancy_2017"="Health..Life.Expectancy.", "Generosity_2017"="Generosity", "Corruption_2017"="Trust..Government.Corruption.", "Dystopia_residual_2017"="Dystopia.Residual", "Score_2017"="Happiness.Score", "Freedom_2017"="Freedom", "Social_support_2017"="Family") %>%
+  select(-c("Whisker.high", "Whisker.low"))
+
+df_2016 <- df_2016 %>% 
+  rename("GDP_2016" = "Economy..GDP.per.Capita.", "Rank_2016"="Happiness.Rank", "Life_expectancy_2016"="Health..Life.Expectancy.", "Generosity_2016"="Generosity", "Corruption_2016"="Trust..Government.Corruption.", "Dystopia_residual_2016"="Dystopia.Residual", "Score_2016"="Happiness.Score", "Freedom_2016"="Freedom", "Social_support_2016"="Family") %>%
+  select(-c("Lower.Confidence.Interval", "Upper.Confidence.Interval"))
+  
+
+df_2015 <- df_2015 %>% 
+  rename("GDP_2015" = "Economy..GDP.per.Capita.", "Rank_2015"="Happiness.Rank", "Life_expectancy_2015"="Health..Life.Expectancy.", "Generosity_2015"="Generosity", "Corruption_2015"="Trust..Government.Corruption.", "Dystopia_residual_2015"="Dystopia.Residual", "Score_2015"="Happiness.Score", "Freedom_2015"="Freedom", "Social_support_2015"="Family") %>%
+  select(-c("Standard.Error", "Region"))
+```
+
+```{r}
+df <-merge(x=df_2015,y=df_2016,by="Country")
+df <- merge(x=df,y=df_2017,by="Country")
+df <- merge(x=df,y=df_2018,by="Country")
+df <- merge(x=df,y=df_2019,by="Country")
+```
+
+```{r}
+remove(df_2015)
+remove(df_2016)
+remove(df_2017)
+remove(df_2018)
+remove(df_2019)
+```
+
+```{r}
+df_europe <- df %>%
+  filter(df$Region == "Western Europe" | df$Region == "Central and Eastern Europe")
+
+df_western_EU <-df %>%
+  filter(df$Region == "Western Europe")
+just_west_ranks <- df_western_EU %>% 
+  select(contains("Rank"))
+         
+West_avg <- mean(as.matrix(just_west_ranks))
+
+df_eastern_EU <- df %>%
+  filter(df$Region == "Central and Eastern Europe")
+just_east_ranks <- df_eastern_EU %>% 
+  select(contains("Rank"))
+
+East_avg <- mean(as.matrix(just_east_ranks))
+```
+
+```{r warning=FALSE}
+library(reshape2)
+
+just_ranks <- df_europe %>% 
+  select(contains("Country") | contains("Rank"))
+
+just_ranks_Nordic_Baltic <- just_ranks %>%
+  filter(Country=="Estonia"|Country=="Finland"|Country=="Latvia"|Country=="Lithuania"|Country=="Russia")
+
+trans=t(just_ranks_Nordic_Baltic)
+colnames(trans) <- trans[1,]
+
+data2 <- trans[-c(1), ]
+data2 <- data.frame(data2, stringsAsFactors = TRUE)
+data2$year <- c(2015, 2016, 2017, 2018, 2019)
+
+df_2 <- melt(data2 ,  id.vars = 'year', variable.name = 'Country')
+df_2$value <- as.numeric(df_2$value)
+```
+
+```{r}
+theme_set(theme_minimal())
+
+ggplot(data=df_2, aes(x=year, y=value, group=Country, col=factor(Country))) +
+  geom_line(aes(alpha=factor(Country)))+
+  scale_alpha_manual(values=c(1, 0.4, 0.4, 0.4, 0.4),guide=F)+
+  scale_colour_manual(values=c("Red", "Black", "Black", "Black", "Black"),guide=F)+
+  ylab(label="World ranking")+
+  xlab(label="Year")+
+  ggtitle(label="Estonian life satisfaction index development path")+
+  scale_y_reverse()+
+  geom_hline(yintercept = East_avg, linetype='dotted', col = 'red2', alpha=0.6)+
+  geom_hline(yintercept = West_avg, linetype='dotted', col = 'blue', alpha=0.6)+
+  annotate("text", x = 2018, y = East_avg, label = "Eastern European average", vjust = -0.5, size=3, alpha=0.7)+
+  annotate("text", x = 2018, y = West_avg, label = "Western European average", vjust = -0.5, size=3, alpha=0.7)+
+  annotate("text", x = 2019, y = 55, label = "Estonia", vjust = 1.3, hjust=1.1, angle=12, size=2.7, alpha=1)+
+  annotate("text", x = 2019, y = 52.5, label = "Latvia", vjust = -0.4, hjust=1.1, angle=0, size=2, alpha=0.7)+
+  annotate("text", x = 2019, y = 68, label = "Russia", vjust = 1.28, hjust=1.1, angle=-14, size=2, alpha=0.7)+
+  annotate("text", x = 2019, y = 42, label = "Lithuania", vjust = -0.5, hjust=1.1, angle=12, size=2, alpha=0.7)+
+  annotate("text", x = 2019, y = 1, label = "Finland", vjust = -0.5, hjust=1.1, angle=0, size=2, alpha=0.7)+
+  theme(legend.position = "none")
+
+```
